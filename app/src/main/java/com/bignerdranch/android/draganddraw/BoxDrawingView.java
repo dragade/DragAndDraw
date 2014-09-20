@@ -11,6 +11,7 @@ import android.util.AttributeSet;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
+import android.widget.Toast;
 
 import java.util.ArrayList;
 
@@ -18,8 +19,14 @@ public class BoxDrawingView extends View {
   public static final String TAG = "BoxDrawingView";
   public static final int RED = 0x22ff0000;
   public static final int WHITE = 0xfff8efe0;
+  public static final int RED2 = 0xFFFF0000;
+
+  public static final int PURPLE = 0xFF990099;
+  public static final int LIGHT_GREEN = 0xFFCCFFCC;
+  public static final int ORANGE = 0xFFFF9933;
 
   private static int[] sColors = new int[] {
+      PURPLE, RED2, LIGHT_GREEN, ORANGE,
       RED, Color.BLACK, Color.BLUE, Color.CYAN, Color.MAGENTA, Color.YELLOW, Color.GRAY
   };
 
@@ -67,6 +74,10 @@ public class BoxDrawingView extends View {
         break;
       case MotionEvent.ACTION_UP:
         mCurrentBox = null;
+
+        if (mBoxes.size() % 5 == 0) {
+          Toast.makeText(this.getContext(), "Wow Liani! There are " + mBoxes.size() + "boxes", Toast.LENGTH_LONG).show();
+        }
         break;
       case MotionEvent.ACTION_CANCEL:
         mCurrentBox = null;
