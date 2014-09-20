@@ -1,5 +1,6 @@
 package com.bignerdranch.android.draganddraw;
 
+import android.animation.ArgbEvaluator;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -14,6 +15,7 @@ import android.view.View;
 import android.widget.Toast;
 
 import java.util.ArrayList;
+import java.util.Random;
 
 public class BoxDrawingView extends View {
   public static final String TAG = "BoxDrawingView";
@@ -24,9 +26,13 @@ public class BoxDrawingView extends View {
   public static final int PURPLE = 0xFF990099;
   public static final int LIGHT_GREEN = 0xFFCCFFCC;
   public static final int ORANGE = 0xFFFF9933;
+  public static final int PINK = 0xFFFF99FF;
+  public static final int BROWN = 0xFF996600;
+
+  int mPrevBoxCount = 0;
 
   private static int[] sColors = new int[] {
-      PURPLE, RED2, LIGHT_GREEN, ORANGE,
+      PURPLE, RED2, LIGHT_GREEN, ORANGE, PINK, BROWN,
       RED, Color.BLACK, Color.BLUE, Color.CYAN, Color.MAGENTA, Color.YELLOW, Color.GRAY
   };
 
@@ -34,6 +40,7 @@ public class BoxDrawingView extends View {
   private ArrayList<Box> mBoxes = new ArrayList<Box>();
   private ArrayList<Paint> mPaints = new ArrayList<Paint>();
   private Paint mBackgroundPaint;
+  final Random mRandom = new Random(System.currentTimeMillis());
 
   // Used when creating the view in code
   public BoxDrawingView(Context context) {
@@ -49,6 +56,27 @@ public class BoxDrawingView extends View {
     mBackgroundPaint.setColor(WHITE);
   }
 
+  private int pickColor() {
+    int currentPaint = mPaints.get(mPaints.size() -1).getColor();
+    int lastPaint = -1;
+    if (mPaints.size() > 1) {
+      lastPaint = mPaints.get(mPaints.size() -2).getColor();
+    }
+
+    int randomIdx = mRandom.nextInt(sColors.length);
+    int color = sColors[randomIdx];
+    for (int i=0; i < 5; i++) {
+      if (currentPaint != color && lastPaint != color) {
+        break;
+      }
+      else {
+        randomIdx = mRandom.nextInt(sColors.length);
+        color = sColors[randomIdx];
+      }
+    }
+    return color;
+  }
+
   @Override
   public boolean onTouchEvent(MotionEvent event) {
     PointF curr = new PointF(event.getX(), event.getY());
@@ -59,6 +87,8 @@ public class BoxDrawingView extends View {
         // Reset drawing state
         mCurrentBox = new Box(curr);
         mBoxes.add(mCurrentBox);
+        mPrevBoxCount++;
+
         paint = new Paint();
         paint.setColor(RED);
         mPaints.add(paint);
@@ -67,16 +97,24 @@ public class BoxDrawingView extends View {
         if (mCurrentBox != null) {
           mCurrentBox.setCurrent(curr);
           paint = new Paint();
-          paint.setColor(sColors[mPaints.size() % sColors.length]);
+          paint.setColor(pickColor());
           mPaints.add(paint);
           invalidate();
         }
         break;
       case MotionEvent.ACTION_UP:
+        Log.d(TAG, String.format("\t Box %d origin %s current %s",
+            mBoxes.size(), mCurrentBox.getOrigin(), mCurrentBox.getCurrent()));
+
         mCurrentBox = null;
+        if (mPrevBoxCount == 2) {
+          addMiddleBox();
+          mPrevBoxCount = 0;
+          invalidate();
+        }
 
         if (mBoxes.size() % 5 == 0) {
-          Toast.makeText(this.getContext(), "Wow Liani! There are " + mBoxes.size() + "boxes", Toast.LENGTH_LONG).show();
+          Toast.makeText(this.getContext(), "Wow Liani! There are " + mBoxes.size() + " boxes", Toast.LENGTH_LONG).show();
         }
         break;
       case MotionEvent.ACTION_CANCEL:
@@ -84,6 +122,69 @@ public class BoxDrawingView extends View {
         break;
     }
     return true;
+  }
+
+  private void addMiddleBox() {
+    //add a new box now which is the mix of the previous two
+    Box a = mBoxes.get(mBoxes.size() - 1);
+    float aleft = Math.min(a.getOrigin().x, a.getCurrent().x);
+    float aright = Math.max(a.getOrigin().x, a.getCurrent().x);
+    float atop = Math.min(a.getOrigin().y, a.getCurrent().y);
+    float abottom = Math.max(a.getOrigin().y, a.getCurrent().y);
+
+    Box b = mBoxes.get(mBoxes.size() - 2);
+    float bleft = Math.min(b.getOrigin().x, b.getCurrent().x);
+    float bright = Math.max(b.getOrigin().x, b.getCurrent().x);
+    float btop = Math.min(b.getOrigin().y, b.getCurrent().y);
+    float bbottom = Math.max(b.getOrigin().y, b.getCurrent().y);
+
+    PointF newOrigin = new PointF(aleft + (aright - aleft) / 2, abottom + (atop - abottom) / 2);
+    PointF newCurrent = new PointF(bleft + (bright - bleft) / 2 , bbottom + (btop - bbottom) / 2);
+    Log.d(TAG, String.format("\t Adding middle box origin %s current %s", newOrigin, newCurrent));
+
+    Box middleBox = new Box(newOrigin);
+    middleBox.setCurrent(newCurrent);
+    Paint p = new Paint();
+    Paint pa = mPaints.get(mPaints.size() -1);
+    Paint pb = mPaints.get(mPaints.size() -2);
+    p.setColor(mergeColor(pa.getColor(), pb.getColor()));
+    mPaints.add(p);
+    mBoxes.add(middleBox);
+  }
+
+  private int merge(int a, int b) {
+    //return Math.min(a, b) + Math.abs(a - b);
+    return (a + b) / 2;
+  }
+
+  private int mergeColor(int colorA, int colorB) {
+    //to properly merge we would need to find the lower red and differences in red, then blue, then green
+//    int alpha = merge(Color.alpha(colorA), Color.alpha(colorB));
+//    int red = merge(Color.red(colorA), Color.red(colorB));
+//    int green = merge(Color.green(colorA), Color.green(colorB));
+//    int blue = merge(Color.blue(colorA), Color.blue(colorB));
+//    int argb = Color.argb(alpha, red, green, blue);
+//    return argb;
+
+    //return (Integer)new ArgbEvaluator().evaluate(0.5f, colorA, colorB);
+
+    return interpolateColor(colorA, colorB, 0.5f);
+  }
+
+  private float interpolate(float a, float b, float proportion) {
+    return (a + ((b - a) * proportion));
+  }
+
+  /** Returns an interpoloated color, between <code>a</code> and <code>b</code> */
+  private int interpolateColor(int a, int b, float proportion) {
+    float[] hsva = new float[3];
+    float[] hsvb = new float[3];
+    Color.colorToHSV(a, hsva);
+    Color.colorToHSV(b, hsvb);
+    for (int i = 0; i < 3; i++) {
+      hsvb[i] = interpolate(hsva[i], hsvb[i], proportion);
+    }
+    return Color.HSVToColor(hsvb);
   }
 
   @Override
